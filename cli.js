@@ -86,6 +86,9 @@ async function main(){
             });
 
             separator('REPONSE');
+            if (result.blocked || result.metrics?.blocked) {
+                console.log(C.fg.red + C.bright + '\n(Requête bloquée pour raisons de sécurité)\n' + C.reset);
+            }
             if (result.usedFallback) {
                 console.log(C.fg.yellow + C.bright + '\n(Remarque: réponse complétée avec connaissances générales, pas trouvée intégralement dans le corpus)\n' + C.reset);
             }
@@ -93,7 +96,7 @@ async function main(){
 
             separator('SOURCES');
             if (!result.sources || result.sources.length === 0) {
-                console.log(C.fg.dim + 'Aucune source trouvée.' + C.reset);
+                console.log(C.dim + 'Aucune source trouvée.' + C.reset);
             } else {
                 result.sources.forEach((s, i) => {
                     console.log(`${C.fg.yellow}- [${i + 1}] ${s}${C.reset}`);
