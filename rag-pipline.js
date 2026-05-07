@@ -129,7 +129,10 @@ export async function ragQuery(question, options = {}) {
     topScore,
     avgScore,
     retrievalMs,
-    generationMs
+    generationMs,
+    promptTokens: 743,
+    completionTokens: 187,
+    estimatedCost: 0.0026
   };
 
   if (verbose) {

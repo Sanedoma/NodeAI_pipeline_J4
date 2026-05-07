@@ -1,0 +1,12 @@
+1. Comment définir un outil dans Pydantic AI ?
+2. Quelle est la différence entre Agent et RunContext ?
+3. Comment streamer une réponse ?
+4. Comment gérer les erreurs ?
+5. Comment fonctionne le dependency injection ?
+6. Comment utiliser les retries ?
+
+7. Comment fonctionne le contexte ?
+8. Comment utiliser un modèle ?
+
+9. Quelle est la capitale du Pérou ?
+10. Qui a gagné la coupe du monde 2018 ?
