@@ -34,6 +34,12 @@ async function runRag() {
   const result = await ragQuery(QUESTION_OK, { verbose: true });
   console.log('[ragQuery.answer]');
   console.log(result.answer);
+  console.log('\nSources :');
+  result.chunks.forEach((chunk, index) => {
+    console.log(
+      `- [${index + 1}] ${chunk.source} (${chunk.score.toFixed(2)})`
+    );
+  });
   console.log('[ragQuery.metrics]');
   console.log(result.metrics);
   console.log('\n');

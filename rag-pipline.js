@@ -138,14 +138,28 @@ export async function ragQuery(question, options = {}) {
 
   return {
     answer,
-    sources: [
-      ...new Set(
-        chunks.map(c => c.source)
-      )
-    ],
+    sources: formatSourceCitations,
     chunks,
     metrics
   };
 }
 
 
+function formatSourceCitations(chunks){
+
+    const unique = new Map();
+
+    chunks.forEach((chunk, i) => {
+        const source = chunk.source || 'Source inconnue';
+
+        if(!unique.has(source)) {
+            unique.set(source, {
+                index: index + 1,
+                file: source,
+                relevance: chunk.score
+            });
+        }
+    });
+
+    return [...unique.values()];
+}
