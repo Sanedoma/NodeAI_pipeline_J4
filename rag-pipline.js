@@ -104,3 +104,48 @@ export async function generateCompletion(question, context){
 
     return data.choices[0].message.content;
 }
+
+export async function ragQuery(question, options = {}) {
+
+  const topK = options.topK || 5;
+  const verbose = options.verbose || false;
+  const retrievalStart = Date.now();
+  const chunks = await retrieveContext(question, topK);
+  const retrievalMs = Date.now() - retrievalStart;
+  const generationStart = Date.now();
+  const answer = await generateCompletion(  question, chunks );
+  const generationMs = Date.now() - generationStart;
+  const scores = chunks.map(c => c.score);
+
+  const topScore = scores.length
+      ? Math.max(...scores)
+      : 0;
+
+  const avgScore = scores.length
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 0;
+
+  const metrics = {
+    topScore,
+    avgScore,
+    retrievalMs,
+    generationMs
+  };
+
+  if (verbose) {
+    console.log('[retrieve]', metrics);
+  }
+
+  return {
+    answer,
+    sources: [
+      ...new Set(
+        chunks.map(c => c.source)
+      )
+    ],
+    chunks,
+    metrics
+  };
+}
+
+
