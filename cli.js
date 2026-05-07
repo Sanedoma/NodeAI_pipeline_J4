@@ -86,6 +86,9 @@ async function main(){
             });
 
             separator('REPONSE');
+            if (result.usedFallback) {
+                console.log(C.fg.yellow + C.bright + '\n(Remarque: réponse complétée avec connaissances générales, pas trouvée intégralement dans le corpus)\n' + C.reset);
+            }
             console.log(C.fg.cyan + result.answer + C.reset);
 
             separator('SOURCES');
