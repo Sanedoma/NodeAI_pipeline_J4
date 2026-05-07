@@ -24,6 +24,11 @@ async function embedText(text){
 
     const data = await response.json();
 
+    if (!data || !data.data || !Array.isArray(data.data) || !data.data[0] || !data.data[0].embedding) {
+        console.error('Mistral embedding API returned unexpected response:', data);
+        return null;
+    }
+
     return data.data[0].embedding;
 }
 
@@ -33,6 +38,7 @@ export async function retrieveContext( query, topK = 5){
     }
 
     const vector = await embedText(query);
+    if (!vector) return [];
     const index = pinecone.index(
         process.env.PINECONE_INDEX_NAME
     );
