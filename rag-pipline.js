@@ -11,6 +11,12 @@ const RETRY_CONFIG = {
     timeoutMs: 30000
 };
 
+const EMBEDDING_RETRY_CONFIG = {
+    maxRetries: 4,
+    initialDelayMs: 1200,
+    timeoutMs: 30000
+};
+
 const CIRCUIT_BREAKER_CONFIG = {
     failureThreshold: 5,
     cooldownMs: 30000
@@ -86,19 +92,7 @@ Cite toujours les sources utilisées.
 `;
 
 async function embedText(text) {
-    const response = await fetch('https://api.mistral.ai/v1/embeddings', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'mistral-embed',
-            input: [text]
-        })
-    });
-
-    const data = await response.json();
+    const data = await fetchEmbeddingWithRetry(text);
 
     if (!data || !data.data || !Array.isArray(data.data) || !data.data[0] || !data.data[0].embedding) {
         console.error('Mistral embedding API returned unexpected response:', data);
@@ -185,6 +179,60 @@ function sanitizePII(text) {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchEmbeddingWithRetry(text) {
+    let lastError;
+
+    for (let attempt = 0; attempt <= EMBEDDING_RETRY_CONFIG.maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), EMBEDDING_RETRY_CONFIG.timeoutMs);
+
+        try {
+            const response = await fetch('https://api.mistral.ai/v1/embeddings', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'mistral-embed',
+                    input: [text]
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                const message = data?.message || `HTTP ${response.status}`;
+                const isRateLimited = response.status === 429 || /rate limit|rate_limited/i.test(message);
+
+                if (isRateLimited && attempt < EMBEDDING_RETRY_CONFIG.maxRetries) {
+                    await sleep(EMBEDDING_RETRY_CONFIG.initialDelayMs * Math.pow(2, attempt));
+                    continue;
+                }
+
+                throw new Error(message);
+            }
+
+            return await response.json();
+        } catch (error) {
+            clearTimeout(timeout);
+            lastError = error;
+            const message = String(error?.message || error);
+            const isRetryable = /rate limit|429|rate_limited|aborted/i.test(message);
+
+            if (!isRetryable || attempt === EMBEDDING_RETRY_CONFIG.maxRetries) {
+                break;
+            }
+
+            await sleep(EMBEDDING_RETRY_CONFIG.initialDelayMs * Math.pow(2, attempt));
+        }
+    }
+
+    throw lastError;
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = RETRY_CONFIG.timeoutMs) {

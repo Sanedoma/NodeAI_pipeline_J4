@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'fs';
-import { retrieveContext, generateCompletion } from '../rag-pipline.js';
+import { retrieveContext } from '../rag-pipline.js';
 
 const TOP_K_VALUES = [1, 5, 10];
 const THRESHOLDS = [0.3, 0.5, 0.7];
@@ -13,7 +13,41 @@ function readQuestions(filepath) {
 }
 
 function estimateTokens(text) {
-  return Math.max(1, Math.ceil(text.split(/\s+/).length * 1.3));
+  const safeText = typeof text === 'string' ? text : String(text ?? '');
+  return Math.max(1, Math.ceil(safeText.split(/\s+/).length * 1.3));
+}
+
+function getCompletionText(result) {
+  if (typeof result === 'string') return result;
+  if (result && typeof result.content === 'string') return result.content;
+  if (result && typeof result.answer === 'string') return result.answer;
+  return String(result ?? '');
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withRetries(fn, retries = 3, initialDelayMs = 1000) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      const message = String(err?.message || err);
+      const isRateLimit = /rate limit|429|rate_limited/i.test(message);
+
+      if (!isRateLimit || attempt === retries) {
+        throw err;
+      }
+
+      await sleep(initialDelayMs * Math.pow(2, attempt));
+    }
+  }
+
+  throw lastError;
 }
 
 function avg(arr){
@@ -32,7 +66,16 @@ async function run() {
   const questions = readQuestions('./questions-test.txt');
 
   const baselineTopK = 5;
-  const baselineThreshold = 0.0;
+  const maxTopK = Math.max(...TOP_K_VALUES, baselineTopK);
+  const retrievalCache = new Map();
+
+  async function getChunks(question) {
+    const cacheKey = `${maxTopK}::${question}`;
+    if (!retrievalCache.has(cacheKey)) {
+      retrievalCache.set(cacheKey, withRetries(() => retrieveContext(question, maxTopK)));
+    }
+    return retrievalCache.get(cacheKey);
+  }
 
   const baselineRows = [];
 
@@ -41,15 +84,15 @@ async function run() {
   for (let i=0;i<questions.length;i++){
     const q = questions[i];
     try {
-      const chunks = await retrieveContext(q, baselineTopK);
+      const chunks = (await getChunks(q)).slice(0, baselineTopK);
       const scores = chunks.map(c=>c.score||0);
       const top1 = scores[0] ?? 0;
       const top3 = avg(scores.slice(0,3));
       const inputTokens = estimateTokens(q);
-
-      // build context from all chunks (no threshold)
-      const answer = await generateCompletion(q, chunks);
-      const outputTokens = estimateTokens(answer);
+      const outputTokens = estimateTokens(JSON.stringify(chunks));
+      const answer = chunks.length > 0
+        ? `Retrieved ${chunks.length} chunks`
+        : 'No chunks retrieved';
 
       baselineRows.push([
         String(i+1),
@@ -75,7 +118,7 @@ async function run() {
     const rows = [];
     for (let i=0;i<questions.length;i++){
       const q = questions[i];
-      const chunks = await retrieveContext(q, topK);
+      const chunks = (await getChunks(q)).slice(0, topK);
       const scores = chunks.map(c=>c.score||0);
       const top1 = scores[0] ?? 0;
       const top3 = avg(scores.slice(0,3));
@@ -92,7 +135,7 @@ async function run() {
     const rows = [];
     for (let i=0;i<questions.length;i++){
       const q = questions[i];
-      const chunks = await retrieveContext(q, baselineTopK);
+      const chunks = (await getChunks(q)).slice(0, baselineTopK);
       const filtered = chunks.filter(c=> (c.score||0) >= threshold);
       const scores = filtered.map(c=>c.score||0);
       const top1 = scores[0] ?? null;

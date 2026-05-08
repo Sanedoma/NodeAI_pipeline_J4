@@ -7,7 +7,8 @@ const MISTRAL_SMALL_INPUT_COST = 0.14 / 1_000_000;
 const MISTRAL_SMALL_OUTPUT_COST = 0.42 / 1_000_000;
 
 function estimateTokens(text) {
-  return Math.ceil(text.split(/\s+/).length * 1.3); // rough estimate
+  const safeText = typeof text === 'string' ? text : String(text ?? '');
+  return Math.ceil(safeText.split(/\s+/).length * 1.3); // rough estimate
 }
 
 function calculateCost(inputTokens, outputTokens) {
