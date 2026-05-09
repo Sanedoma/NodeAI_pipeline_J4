@@ -103,11 +103,11 @@ async function run() {
         '$' + ( (inputTokens+outputTokens)*0.000001 ).toFixed(6),
         assessPertinence(chunks),
         assessFidelity(answer),
-        ''
+        computeNote(chunks)
       ]);
     } catch (err) {
       console.error(`Error processing question ${i+1}:`, err.message);
-      baselineRows.push([String(i+1), q.replace(/\|/g,'\\|'), 'ERR','ERR','?','?','Erreur','Erreur','']);
+      baselineRows.push([String(i+1), q.replace(/\|/g,'\\|'), 'ERR','ERR','?','?','Erreur','Erreur','0/5']);
     }
   }
 
@@ -125,7 +125,7 @@ async function run() {
       const pertinence = assessPertinence(chunks);
       const fidelity = 'À vérifier';
       rows.push([
-        String(i+1), q.replace(/\|/g,'\\|'), top1.toFixed(3), top3.toFixed(3), pertinence, fidelity, ''
+        String(i+1), q.replace(/\|/g,'\\|'), top1.toFixed(3), top3.toFixed(3), pertinence, fidelity, computeNote(chunks)
       ]);
     }
     variants.push({ name: `topK=${topK}`, headers: ['#','Question','Top-1 Score','Avg Top-3','Pertinence','Fidélité','Notes'], rows });
@@ -143,7 +143,7 @@ async function run() {
       const pertinence = assessPertinence(filtered);
       const fidelity = 'À vérifier';
       rows.push([
-        String(i+1), q.replace(/\|/g,'\\|'), (top1===null)?'Aucun':(top1.toFixed(3)), (top3===null)?'Aucun':(top3.toFixed(3)), pertinence, fidelity, ''
+        String(i+1), q.replace(/\|/g,'\\|'), (top1===null)?'Aucun':(top1.toFixed(3)), (top3===null)?'Aucun':(top3.toFixed(3)), pertinence, fidelity, computeNote(filtered)
       ]);
     }
     variants.push({ name: `threshold=${threshold}`, headers: ['#','Question','Top-1 Score','Avg Top-3','Pertinence','Fidélité','Notes'], rows });
@@ -175,6 +175,13 @@ function assessFidelity(answer){
   if (!answer) return 'À vérifier';
   if (answer.toLowerCase().includes('je ne trouve pas')) return '5';
   return 'À vérifier';
+}
+
+function computeNote(chunks){
+  if (!chunks || chunks.length === 0) return '0/5';
+  const avgScore = avg(chunks.map(c=>c.score||0));
+  const note = Math.max(0, Math.min(5, Math.round(avgScore * 5)));
+  return `${note}/5`;
 }
 
 run().catch(err=>{
