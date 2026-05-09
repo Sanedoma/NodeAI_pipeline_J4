@@ -471,15 +471,9 @@ user> help                                 # Aide
 
 ---
 
-## 📄 License
-
-À définir selon contexte IPSSI.
-
----
-
 ## 👤 Auteur
 
-Développement : BachelorDEV - UE1 - NODE_IA
+BachelorDEV - UE1 - NODE_IA: Ousmane Ndiaye & Omar Kessentini
 
 ---
 
